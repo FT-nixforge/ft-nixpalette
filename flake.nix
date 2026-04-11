@@ -7,27 +7,25 @@
   };
 
   outputs = { self, nixpkgs, stylix, ... }:
+  let
+    nixpaletteLib = import ./lib { inherit (nixpkgs) lib; };
+    builtinThemesDir = ./themes;
+  in
   {
-    let
-      nixpaletteLib = import ./lib { inherit (nixpkgs) lib; };
-      builtinThemesDir = ./themes;
-    in
-    {
-      lib = nixpaletteLib;
+    lib = nixpaletteLib;
 
-      nixosModules.default = {
-        imports = [
-          stylix.nixosModules.stylix
-          (import ./modules/nixos.nix { inherit nixpaletteLib builtinThemesDir; })
-        ];
-      };
+    nixosModules.default = {
+      imports = [
+        stylix.nixosModules.stylix
+        (import ./modules/nixos.nix { inherit nixpaletteLib builtinThemesDir; })
+      ];
+    };
 
-      homeManagerModules.default = {
-        imports = [
-          stylix.homeManagerModules.stylix
-          (import ./modules/hm.nix { inherit nixpaletteLib builtinThemesDir; })
-        ];
-      };
+    homeManagerModules.default = {
+      imports = [
+        stylix.homeManagerModules.stylix
+        (import ./modules/hm.nix { inherit nixpaletteLib builtinThemesDir; })
+      ];
     };
   };
 }
