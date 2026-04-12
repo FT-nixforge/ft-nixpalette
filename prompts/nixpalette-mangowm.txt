@@ -1,0 +1,139 @@
+You are building `nixpalette-mangowm` — a NixOS/Home Manager flake that integrates
+the nixpalette theme framework with the MangoWM (mangowc) compositor ecosystem.
+
+## What nixpalette provides (the dependency)
+
+nixpalette (github:FTMahringer/nixpalette) is a theme management flake built on
+top of Stylix. At build time it writes two files:
+
+  NixOS:        /etc/nixpalette/colors.json
+                /etc/nixpalette/themes.json
+  Home Manager: $XDG_DATA_HOME/nixpalette/colors.json
+                $XDG_DATA_HOME/nixpalette/themes.json
+
+colors.json structure:
+  { "themeId": "builtin:base/nord", "polarity": "dark", "base16": { "base00": "2e3440", ... } }
+
+themes.json structure:
+  { "<themeId>": { "themeId": "...", "polarity": "...", "base16": { ... }, "meta": { ... } }, ... }
+
+All base16 hex values are plain 6-character strings WITHOUT a leading #.
+Standard semantic mapping: base00=background, base05=foreground, base08=red,
+base0B=green, base0C=cyan, base0D=blue, base0E=purple.
+
+## What MangoWM is
+
+MangoWM (mangowc) is a lightweight, feature-rich Wayland compositor inspired by dwm.
+It supports tiling and dynamic layouts, animations, XWayland, scratchpads,
+tag-based workspaces, blur/shadows/rounded corners, and hot-reload configuration.
+
+Official flake:   github:DreamMaoMao/mangowc
+NixOS option:     programs.mangowc.enable = true
+Config location:  ~/.config/mango/config.conf  (user)
+                  /etc/mango/config.conf         (system-wide)
+Wallpaper tool:   swaybg (same as Sway ecosystem)
+Notification:     mako or dunst
+Bar:              waybar or similar
+
+## What nixpalette-mangowm should provide
+
+A separate flake with nixosModules.default and homeManagerModules.default that
+adds MangoWM-ecosystem theming on top of nixpalette. All options live under the
+`nixpalette-mangowm` namespace.
+
+### 1. swaybg — wallpaper
+- Declare `nixpalette-mangowm.swaybg.enable` (default: true)
+- Set wallpaper from colors.json on session start via exec_always in mango config
+- Provide `nixpalette-mangowm.swaybg.wallpaper` option (null or path) as override
+- swaybg supports only static images; document this clearly
+
+### 2. MangoWM border colors
+- Declare `nixpalette-mangowm.borders.enable` (default: true)
+- Inject border color settings into ~/.config/mango/config.conf via Home Manager:
+    active_border_color   → base0D (blue)
+    inactive_border_color → base03
+    urgent_border_color   → base08 (red)
+- If mangowc Home Manager module exists, use it; otherwise write the config fragment
+  via home.file or xdg.configFile
+
+### 3. mako — notification daemon
+- Declare `nixpalette-mangowm.mako.enable` (default: true)
+- Generate mako config from base16:
+    background-color → base01
+    border-color     → base0D
+    text-color       → base05
+    border-size      → 2
+  For urgency-critical: border-color → base08
+
+### 4. waybar
+- Declare `nixpalette-mangowm.waybar.enable` (default: false)
+- Inject CSS variables for all 16 base16 colors into waybar style:
+    @define-color base00 #<base00>;
+    ... all 16 slots ...
+- Prepend the variable block to the user's existing waybar CSS so they can
+  reference @base0D etc. without hardcoding colors
+
+### 5. rofi / wofi — launcher
+- Declare `nixpalette-mangowm.rofi.enable` and `nixpalette-mangowm.wofi.enable`
+- Generate matching color themes from base16 colors
+- rofi: write ~/.config/rofi/colors.rasi with base16 variables
+- wofi: write ~/.config/wofi/style.css with base16 CSS variables
+
+### 6. foot — terminal
+- Declare `nixpalette-mangowm.foot.enable` (default: false)
+- Generate foot color theme from base16 via programs.foot.settings:
+    background → base00
+    foreground → base05
+    regular0–7 → base00–08 mapping
+    bright0–7  → same with slight lightness offset or repeat
+
+### 7. Live theme switcher script
+- Provide package `nixpalette-mangowm.packages.${system}.nixpalette-switch`
+- Script reads themes.json, presents a picker (fzf or wofi --dmenu), then:
+    1. Writes ~/.cache/nixpalette/active.json with chosen theme
+    2. Kills and restarts swaybg with the new wallpaper
+    3. Sends SIGHUP to mako (makoctl reload)
+    4. Reloads waybar (pkill -SIGUSR2 waybar) if running
+    5. Sends notify-send confirmation
+- Works only for themes present in themes.json (nixpalette.preloadThemes)
+- Expose the script via environment.systemPackages or home.packages
+
+## Architecture requirements
+
+- flake inputs:
+    inputs.nixpalette.url = "github:FTMahringer/nixpalette"
+    inputs.mangowc.url = "github:DreamMaoMao/mangowc"
+- Re-export nixpalette's modules so users only need to import nixpalette-mangowm
+- Do NOT re-declare nixpalette options — read from config.nixpalette.* and JSON files
+- All core features (swaybg, borders, mako) default to true
+- Potentially-conflicting features (waybar, rofi, wofi, foot) default to false
+- Home Manager module: user-space config (borders via xdg.configFile, mako,
+  waybar CSS, launcher themes, switcher in PATH)
+- NixOS module: system packages (swaybg, mako, foot, wofi/rofi installed)
+- The mangowc NixOS module from the upstream flake handles compositor installation;
+  nixpalette-mangowm should NOT replicate that — just declare it as a dependency
+
+## Files to create
+
+- flake.nix
+- modules/nixos.nix
+- modules/hm.nix
+- modules/swaybg.nix
+- modules/borders.nix
+- modules/mako.nix
+- modules/waybar.nix
+- modules/launcher.nix     (rofi/wofi)
+- modules/foot.nix
+- pkgs/nixpalette-switch/
+- README.md
+
+## README should document
+
+- Prerequisites: MangoWM installed via mangowc flake + nixpalette configured
+  with preloadThemes
+- How to import nixpalette, mangowc, and nixpalette-mangowm modules together
+- nixpalette-switch usage and picker dependency (fzf or wofi)
+- Each module's options table
+- Note: MangoWM config hot-reloads on SIGHUP; document how to trigger
+- Note: swaybg does not support animated wallpapers; mention alternative with mpv
+- Example flake.nix snippet showing all three flakes wired together
