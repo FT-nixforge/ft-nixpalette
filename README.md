@@ -90,6 +90,7 @@ homeConfigurations.myUser = home-manager.lib.homeManagerConfiguration {
 | `nixpalette.userThemeDir` | `null or path` | `null` | Path to user theme directory |
 | `nixpalette.stylixOverrides` | `attrs` | `{}` | Extra Stylix options merged on top of the theme |
 | `nixpalette.specialisations` | `attrsOf str` | `{}` | Pre-build theme variants as NixOS specialisations (NixOS only) |
+| `nixpalette.preloadThemes` | `listOf str` | `[]` | Extra themes to resolve and bake into `themes.json` at build time |
 
 ## Theme Identifiers
 
@@ -243,11 +244,31 @@ stylix.fonts.monospace = {
 
 ## Built-in Themes
 
+### Base themes
+
 | ID | Polarity | Description |
 |----|----------|-------------|
 | `builtin:base/catppuccin-mocha` | dark | Warm dark theme with pastel accents |
+| `builtin:base/catppuccin-latte` | light | Warm, creamy light theme with pastel accents |
 | `builtin:base/nord` | dark | Arctic, north-bluish palette |
-| `builtin:derived/catppuccin-mocha-compact` | dark | Catppuccin Mocha with smaller fonts and Iosevka |
+| `builtin:base/dracula` | dark | Vivid purple and pink accents on deep grey |
+| `builtin:base/gruvbox-dark` | dark | Retro groove with warm earthy tones |
+| `builtin:base/gruvbox-light` | light | Warm parchment-toned light variant of Gruvbox |
+| `builtin:base/solarized-dark` | dark | Precision dark theme with unique chroma relationships |
+| `builtin:base/solarized-light` | light | Precision light theme with warm parchment tones |
+| `builtin:base/tokyo-night` | dark | Clean dark theme inspired by Tokyo city lights |
+| `builtin:base/one-dark` | dark | Atom's iconic dark theme with cool blue-grey tones |
+| `builtin:base/rose-pine` | dark | Soothingly dark with dusty rose and warm neutrals |
+| `builtin:base/everforest-dark` | dark | Comfortable, nature-inspired green-based palette |
+
+### Derived themes
+
+| ID | Parent | Description |
+|----|--------|-------------|
+| `builtin:derived/catppuccin-mocha-compact` | catppuccin-mocha | Smaller fonts and Iosevka mono |
+| `builtin:derived/catppuccin-latte-compact` | catppuccin-latte | Smaller fonts and Iosevka mono |
+| `builtin:derived/rose-pine-nerd` | rose-pine | Nerd Font patched JetBrains Mono |
+| `builtin:derived/gruvbox-dark-nerd` | gruvbox-dark | Nerd Font patched Hack |
 
 ## Fast Theme Switching with Specialisations
 
@@ -282,16 +303,54 @@ Each specialisation is a full NixOS configuration with a different `nixpalette.t
 
 ## Colors Export
 
-nixpalette generates a JSON file with the resolved theme's color scheme at build time:
+nixpalette generates two JSON files at build time:
 
-- **NixOS:** `/etc/nixpalette/colors.json`
-- **Home Manager:** `$XDG_DATA_HOME/nixpalette/colors.json`
+- **`colors.json`** — the active theme's resolved palette
+  - NixOS: `/etc/nixpalette/colors.json`
+  - Home Manager: `$XDG_DATA_HOME/nixpalette/colors.json`
 
-This file contains the theme ID, polarity, and full base16 palette. Use it in scripts, widgets, or external tools:
+- **`themes.json`** — every preloaded theme's resolved palette, keyed by theme ID
+  - NixOS: `/etc/nixpalette/themes.json`
+  - Home Manager: `$XDG_DATA_HOME/nixpalette/themes.json`
+
+The active theme is always included in `themes.json`. Add more themes via `preloadThemes`:
+
+```nix
+nixpalette = {
+  enable = true;
+  theme  = "builtin:base/catppuccin-mocha";
+  preloadThemes = [
+    "builtin:base/nord"
+    "builtin:base/dracula"
+    "builtin:base/tokyo-night"
+  ];
+};
+```
+
+This bakes the full base16 palette of every listed theme into the system closure at rebuild time. A live switcher can then apply any of them at runtime — no network fetch, no Nix build:
 
 ```bash
 # Read the current accent color
 jq -r '.base16.base0D' /etc/nixpalette/colors.json
+
+# List all preloaded theme IDs
+jq -r 'keys[]' /etc/nixpalette/themes.json
+
+# Get the full palette for a specific preloaded theme
+jq '.["builtin:base/nord"].base16' /etc/nixpalette/themes.json
+```
+
+The `themes.json` structure per entry:
+
+```json
+{
+  "builtin:base/nord": {
+    "themeId":  "builtin:base/nord",
+    "polarity": "dark",
+    "base16":   { "base00": "2e3440", ... },
+    "meta":     { "author": "Arctic Ice Studio", "tags": ["dark", "nord"] }
+  }
+}
 ```
 
 ## Future Theme Switcher Integration
@@ -304,6 +363,6 @@ nixpalette is designed to support a future theme switcher:
 
 ## Known Limitations
 
-- **Rebuild required** — theme changes require a NixOS rebuild. Use [specialisations](#fast-theme-switching-with-specialisations) to pre-build multiple themes for near-instant switching without a network build
+- **Rebuild required for new themes** — applying a theme not in `preloadThemes` requires a NixOS rebuild. Add frequently-used themes to `preloadThemes` so a future live switcher can apply them at runtime. Use [specialisations](#fast-theme-switching-with-specialisations) for near-instant full-system switching.
 - **Single parent** — each derived theme can inherit from exactly one parent; multiple inheritance is not supported
 - **Evaluation-time resolution** — theme loading uses `builtins.readDir` at Nix evaluation time; the theme directory must exist and be accessible during `nix eval`

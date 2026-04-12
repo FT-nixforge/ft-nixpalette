@@ -26,6 +26,24 @@ let
     base16   = resolvedTheme.base16;
   };
 
+  # Resolve every theme listed in preloadThemes and serialise the full set to
+  # a single JSON object keyed by theme ID.  A live-switcher can read this file
+  # and apply any pre-resolved palette at runtime without a Nix rebuild.
+  themesJson =
+    let
+      preloadIds  = lib.unique ([ cfg.theme ] ++ cfg.preloadThemes);
+      resolveOne  = themeId:
+        let r = nixpaletteLib.resolve allThemes themeId;
+        in {
+          themeId  = themeId;
+          polarity = r.polarity;
+          base16   = r.base16;
+          meta     = r.meta or {};
+        };
+    in
+    builtins.toJSON (builtins.listToAttrs
+      (map (id: { name = id; value = resolveOne id; }) preloadIds));
+
 in
 {
   options.nixpalette = {
@@ -82,12 +100,32 @@ in
       '';
     };
 
+    preloadThemes = lib.mkOption {
+      type        = lib.types.listOf lib.types.str;
+      default     = [];
+      description = ''
+        List of additional theme IDs to resolve and bake into
+        /etc/nixpalette/themes.json at build time.
+        The active theme is always included automatically.
+        A live theme switcher can read this file and apply any of the
+        preloaded palettes at runtime without a NixOS rebuild.
+      '';
+      example = lib.literalExpression ''
+        [
+          "builtin:base/nord"
+          "builtin:base/dracula"
+          "builtin:base/tokyo-night"
+        ]
+      '';
+    };
+
   };
 
   config = lib.mkIf cfg.enable {
     stylix = stylixConfig;
 
     environment.etc."nixpalette/colors.json".text = colorsJson;
+    environment.etc."nixpalette/themes.json".text  = themesJson;
 
     specialisation = lib.mapAttrs (_name: themeId: {
       configuration = {

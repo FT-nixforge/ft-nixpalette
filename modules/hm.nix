@@ -26,6 +26,21 @@ let
     base16   = resolvedTheme.base16;
   };
 
+  themesJson =
+    let
+      preloadIds  = lib.unique ([ cfg.theme ] ++ cfg.preloadThemes);
+      resolveOne  = themeId:
+        let r = nixpaletteLib.resolve allThemes themeId;
+        in {
+          themeId  = themeId;
+          polarity = r.polarity;
+          base16   = r.base16;
+          meta     = r.meta or {};
+        };
+    in
+    builtins.toJSON (builtins.listToAttrs
+      (map (id: { name = id; value = resolveOne id; }) preloadIds));
+
 in
 {
   options.nixpalette = {
@@ -65,11 +80,31 @@ in
       example = lib.literalExpression ''{ cursor.size = 32; }'';
     };
 
+    preloadThemes = lib.mkOption {
+      type        = lib.types.listOf lib.types.str;
+      default     = [];
+      description = ''
+        List of additional theme IDs to resolve and bake into
+        $XDG_DATA_HOME/nixpalette/themes.json at build time.
+        The active theme is always included automatically.
+        A live theme switcher can read this file and apply any of the
+        preloaded palettes at runtime without a Home Manager rebuild.
+      '';
+      example = lib.literalExpression ''
+        [
+          "builtin:base/nord"
+          "builtin:base/dracula"
+          "builtin:base/tokyo-night"
+        ]
+      '';
+    };
+
   };
 
   config = lib.mkIf cfg.enable {
     stylix = stylixConfig;
 
     xdg.dataFile."nixpalette/colors.json".text = colorsJson;
+    xdg.dataFile."nixpalette/themes.json".text  = themesJson;
   };
 }
