@@ -35,19 +35,16 @@ jobs:
         run: nix eval .#lib --apply builtins.attrNames
 
       - name: Verify nixosModules export
-        run: nix eval .#nixosModules.default --apply '(_: "ok")'
+        run: |
+          nix eval .#nixosModules.default --apply 'x: "ok"'
 
       - name: Verify homeManagerModules export
-        run: nix eval .#homeManagerModules.default --apply '(_: "ok")'
+        run: |
+          nix eval .#homeManagerModules.default --apply 'x: "ok"'
 
       - name: Verify built-in themes load
         run: |
-          nix eval .#lib --apply '
-            lib: builtins.attrNames (lib.loadAllThemes {
-              builtinRoot = builtins.toString ./themes;
-              userRoot = null;
-            })
-          '
+          nix eval .#lib --apply 'lib: builtins.attrNames (lib.loadAllThemes { builtinRoot = builtins.toString ./themes; userRoot = null; })'
 
       - name: Summary
         if: always()

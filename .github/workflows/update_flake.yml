@@ -43,8 +43,8 @@ jobs:
       - name: Verify lib and modules still export correctly
         run: |
           nix eval .#lib --apply builtins.attrNames
-          nix eval .#nixosModules.default --apply '(_: "ok")'
-          nix eval .#homeManagerModules.default --apply '(_: "ok")'
+          nix eval .#nixosModules.default --apply 'x: "ok"'
+          nix eval .#homeManagerModules.default --apply 'x: "ok"'
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
