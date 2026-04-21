@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version and status from flake.nix
+        id: meta
+        run: |
+          VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' flake.nix | head -n1)
+          STATUS=$(grep -oP 'status\s*=\s*"\K[^"]+' flake.nix | head -n1)
+
+          if [ -z "$VERSION" ]; then
+            echo "Could not extract version from flake.nix"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "Extracted version: $VERSION, status: $STATUS"
+
+      - name: Check if version tag already exists
+        id: tag_check
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists, skipping release"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create version Git tag
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Update floating status tag
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          STATUS="${{ steps.meta.outputs.status }}"
+          if [ -n "$STATUS" ]; then
+            git tag -f "$STATUS" -m "Update $STATUS tag to v${{ steps.meta.outputs.version }}"
+            git push -f origin "$STATUS"
+            echo "Updated floating tag: $STATUS"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.meta.outputs.version }}
+          name: v${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
