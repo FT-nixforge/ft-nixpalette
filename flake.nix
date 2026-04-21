@@ -20,6 +20,17 @@
       else null;
   in
   {
+    meta = {
+      name         = "ft-nixpalette";
+      type         = "library";
+      role         = "parent";
+      description  = "Base16 color theming engine";
+      repo         = "github:FT-nixforge/nixpalette";
+      provides     = [ "nixosModules" "homeModules" "lib" ];
+      dependencies = [];
+      status       = "stable";
+      version      = "1.0.1";
+    };
     lib = ftNixpaletteLib;
 
     nixosModules.default = {
