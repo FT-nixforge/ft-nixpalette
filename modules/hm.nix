@@ -15,6 +15,16 @@ let
 
   resolvedTheme = ftNixpaletteLib.resolve allThemes cfg.theme;
 
+  deArgs = { inherit lib resolvedTheme; };
+  deHmConfig =
+    if      cfg.integrations.de == "Hyprland" then (import ./integrations/de/hyprland.nix deArgs).hmConfig
+    else if cfg.integrations.de == "MangoWC"  then (import ./integrations/de/mangowc.nix  deArgs).hmConfig
+    else if cfg.integrations.de == "Niri"     then (import ./integrations/de/niri.nix     deArgs).hmConfig
+    else if cfg.integrations.de == "GNOME"    then (import ./integrations/de/gnome.nix    deArgs).hmConfig
+    else if cfg.integrations.de == "KDE"      then (import ./integrations/de/kde.nix      deArgs).hmConfig
+    else if cfg.integrations.de == "COSMIC"   then (import ./integrations/de/cosmic.nix   deArgs).hmConfig
+    else {};
+
   stylixConfig = import ./stylix.nix {
     inherit lib pkgs resolvedTheme;
     inherit (cfg) stylixOverrides;
@@ -47,6 +57,8 @@ in
   options."ft-nixpalette" = {
 
     enable = lib.mkEnableOption "ft-nixpalette theme management (Home Manager)";
+
+    integrations = import ./integrations/de/default.nix { inherit lib; };
 
     theme = lib.mkOption {
       type        = lib.types.str;
@@ -114,10 +126,14 @@ in
 
   };
 
-  config = lib.mkIf cfg.enable {
-    stylix = stylixConfig;
+  config = lib.mkIf cfg.enable (lib.mkMerge [
+    {
+      stylix = stylixConfig;
 
-    xdg.dataFile."ft-nixpalette/colors.json".text = colorsJson;
-    xdg.dataFile."ft-nixpalette/themes.json".text  = themesJson;
-  };
+      xdg.dataFile."ft-nixpalette/colors.json".text = colorsJson;
+      xdg.dataFile."ft-nixpalette/themes.json".text  = themesJson;
+    }
+
+    (lib.mkIf (cfg.integrations.de != null) deHmConfig)
+  ]);
 }

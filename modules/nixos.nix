@@ -15,6 +15,16 @@ let
 
   resolvedTheme = ftNixpaletteLib.resolve allThemes cfg.theme;
 
+  deArgs = { inherit lib resolvedTheme; };
+  deNixosConfig =
+    if      cfg.integrations.de == "Hyprland" then (import ./integrations/de/hyprland.nix deArgs).nixosConfig
+    else if cfg.integrations.de == "MangoWC"  then (import ./integrations/de/mangowc.nix  deArgs).nixosConfig
+    else if cfg.integrations.de == "Niri"     then (import ./integrations/de/niri.nix     deArgs).nixosConfig
+    else if cfg.integrations.de == "GNOME"    then (import ./integrations/de/gnome.nix    deArgs).nixosConfig
+    else if cfg.integrations.de == "KDE"      then (import ./integrations/de/kde.nix      deArgs).nixosConfig
+    else if cfg.integrations.de == "COSMIC"   then (import ./integrations/de/cosmic.nix   deArgs).nixosConfig
+    else {};
+
   stylixConfig = import ./stylix.nix {
     inherit lib pkgs resolvedTheme;
     inherit (cfg) stylixOverrides;
@@ -50,6 +60,8 @@ in
   options."ft-nixpalette" = {
 
     enable = lib.mkEnableOption "ft-nixpalette theme management";
+
+    integrations = import ./integrations/de/default.nix { inherit lib; };
 
     theme = lib.mkOption {
       type        = lib.types.str;
@@ -134,17 +146,21 @@ in
 
   };
 
-  config = lib.mkIf cfg.enable {
-    stylix = stylixConfig;
+  config = lib.mkIf cfg.enable (lib.mkMerge [
+    {
+      stylix = stylixConfig;
 
-    environment.etc."ft-nixpalette/colors.json".text = colorsJson;
-    environment.etc."ft-nixpalette/themes.json".text  = themesJson;
+      environment.etc."ft-nixpalette/colors.json".text = colorsJson;
+      environment.etc."ft-nixpalette/themes.json".text  = themesJson;
 
-    specialisation = lib.mapAttrs (_name: themeId: {
-      configuration = {
-        "ft-nixpalette".theme = lib.mkForce themeId;
-        "ft-nixpalette".specialisations = lib.mkForce {};
-      };
-    }) cfg.specialisations;
-  };
+      specialisation = lib.mapAttrs (_name: themeId: {
+        configuration = {
+          "ft-nixpalette".theme          = lib.mkForce themeId;
+          "ft-nixpalette".specialisations = lib.mkForce {};
+        };
+      }) cfg.specialisations;
+    }
+
+    (lib.mkIf (cfg.integrations.de != null) deNixosConfig)
+  ]);
 }

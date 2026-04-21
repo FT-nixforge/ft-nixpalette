@@ -23,7 +23,7 @@
     meta = {
       name         = "ft-nixpalette";
       type         = "library";
-      role         = "parent";
+      role         = "standalone";
       description  = "Base16 color theming engine";
       repo         = "github:FT-nixforge/nixpalette";
       provides     = [ "nixosModules" "homeModules" "lib" ];

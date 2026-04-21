@@ -9,6 +9,7 @@ A reusable NixOS theme framework built on top of [Stylix](https://github.com/dan
 - NixOS Specialisations for near-instant theme switching
 - Color JSON export for live switcher integration
 - Stylix integration — no manual Stylix config needed
+- DE integration layer — Hyprland support built-in, more DEs planned
 
 ## Quick Install
 
@@ -23,6 +24,40 @@ ft-nixpalette = {
   theme  = "builtin:base/catppuccin-mocha";
 };
 ```
+
+## Hyprland Integration
+
+Setting `integrations.de = "Hyprland"` generates a color variable file from the
+active palette. Hyprland must already be installed; this only writes config.
+
+```nix
+ft-nixpalette = {
+  enable = true;
+  theme  = "builtin:base/catppuccin-mocha";
+  integrations.de = "Hyprland";
+};
+```
+
+**Generated file:**
+
+| Context | Path |
+|---|---|
+| NixOS | `/etc/ft-nixpalette/hyprland/colors.conf` |
+| Home Manager | `~/.config/hypr/ft-nixpalette-colors.conf` |
+
+Source it in `hyprland.conf` to use `$ft_base0D` etc. anywhere:
+
+```conf
+source = ~/.config/hypr/ft-nixpalette-colors.conf
+
+# example usage
+col.active_border   = $ft_base0D $ft_base0E 45deg
+col.inactive_border = $ft_base03
+```
+
+Theming for Waybar, Rofi, hyprlock, and other DE tools is intentionally left to
+those tools' own configuration — ft-nixpalette exposes the palette via the color
+variables file and the JSON files (`colors.json`, `themes.json`) for them to consume.
 
 ## Documentation
 
