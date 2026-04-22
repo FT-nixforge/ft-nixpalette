@@ -59,12 +59,15 @@ in
 {
   options."ft-nixpalette" = {
 
-    enable = lib.mkEnableOption "ft-nixpalette theme management (Home Manager)";
+    enable = lib.mkEnableOption "ft-nixpalette theme management (Home Manager)" // {
+      default = false;
+    };
 
     integrations = import ./integrations/de/default.nix { inherit lib; };
 
     theme = lib.mkOption {
       type        = lib.types.str;
+      default     = "builtin:base/catppuccin-mocha";
       description = ''
         Namespaced theme identifier to apply.
         Use the format "<namespace>:<category>/<name>".
@@ -106,6 +109,22 @@ in
         Set this to override the flake default with your own image.
       '';
       example = lib.literalExpression "./my-wallpaper.png";
+    };
+
+    specialisations = lib.mkOption {
+      type        = lib.types.attrsOf lib.types.str;
+      default     = {};
+      description = ''
+        Map of specialisation name → theme ID.
+        Used by the NixOS module to propagate theme changes into
+        Home-Manager specialisations. Normally auto-set by the NixOS module.
+      '';
+      example = lib.literalExpression ''
+        {
+          dark  = "builtin:base/catppuccin-mocha";
+          light = "builtin:base/nord";
+        }
+      '';
     };
 
     preloadThemes = lib.mkOption {

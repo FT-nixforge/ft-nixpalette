@@ -1,12 +1,35 @@
 # NixOS module for ft-nixpalette.
 # Declares user-facing options, loads themes, resolves inheritance,
-# and delegates to Stylix via modules/stylix.nix.
+# delegates to Stylix via modules/stylix.nix, and auto-configures
+# Home-Manager when available.
 { ftNixpaletteLib, builtinThemesDir, defaultWallpaper }:
 
 { config, lib, pkgs, ... }:
 
 let
   cfg = config."ft-nixpalette";
+
+  # Check if home-manager is available in the NixOS configuration
+  hmAvailable = config ? home-manager.users;
+
+  # Default stylix overrides (fonts, cursor, opacity)
+  defaultStylixOverrides = {
+    fonts.monospace = {
+      name = "JetBrainsMono Nerd Font";
+      package = pkgs.nerd-fonts.jetbrains-mono;
+    };
+    cursor = {
+      package = pkgs.bibata-cursors;
+      name = "Bibata-Modern-Classic";
+      size = 24;
+    };
+    opacity = {
+      terminal = 0.95;
+      applications = 1.0;
+      desktop = 1.0;
+      popups = 1.0;
+    };
+  };
 
   allThemes = ftNixpaletteLib.loadAllThemes {
     builtinRoot = builtinThemesDir;
@@ -68,6 +91,7 @@ in
 
     theme = lib.mkOption {
       type        = lib.types.str;
+      default     = "builtin:base/catppuccin-mocha";
       description = ''
         Namespaced theme identifier to apply.
         Use the format "<namespace>:<category>/<name>".
@@ -102,11 +126,13 @@ in
 
     stylixOverrides = lib.mkOption {
       type        = lib.types.attrs;
-      default     = {};
+      default     = defaultStylixOverrides;
       description = ''
         Additional Stylix options merged on top of theme-provided values.
         Theme values are set with mkDefault priority, so plain values here
         take precedence. For full control, use lib.mkForce.
+        Defaults are provided for fonts, cursor and opacity.
+        Set to {} to disable all defaults.
       '';
       example = lib.literalExpression ''{ cursor.size = 32; }'';
     };
@@ -147,6 +173,19 @@ in
       '';
     };
 
+    homeManagerIntegration = {
+      enable = lib.mkOption {
+        type        = lib.types.bool;
+        default     = true;
+        description = ''
+          Automatically configure ft-nixpalette for all home-manager users.
+          When enabled, the NixOS module will propagate all ft-nixpalette
+          settings (theme, userThemeDir, specialisations, preloadThemes,
+          stylixOverrides) to every home-manager user.
+        '';
+      };
+    };
+
   };
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
@@ -156,12 +195,34 @@ in
       environment.etc."ft-nixpalette/colors.json".text = colorsJson;
       environment.etc."ft-nixpalette/themes.json".text  = themesJson;
 
-      specialisation = lib.mapAttrs (_name: themeId: {
-        configuration = {
-          "ft-nixpalette".theme          = lib.mkForce themeId;
-          "ft-nixpalette".specialisations = lib.mkForce {};
-        };
-      }) cfg.specialisations;
+      # ── Auto-configure Home-Manager ──────────────────────────────────────
+      home-manager.users = lib.mkIf (hmAvailable && cfg.homeManagerIntegration.enable) (
+        lib.mapAttrs (_: _: {
+          "ft-nixpalette" = {
+            enable = true;
+            inherit (cfg) theme userThemeDir specialisations preloadThemes;
+            stylixOverrides = cfg.stylixOverrides;
+          };
+        }) config.home-manager.users
+      );
+
+      # ── Specialisations ──────────────────────────────────────────────────
+      specialisation = lib.mapAttrs
+        (name: themeId: {
+          configuration = lib.mkMerge [
+            {
+              "ft-nixpalette".theme          = lib.mkForce themeId;
+              "ft-nixpalette".specialisations = lib.mkForce {};
+            }
+            # Auto-propagate specialisations to Home-Manager users
+            (lib.mkIf (hmAvailable && cfg.homeManagerIntegration.enable) {
+              home-manager.users = lib.mapAttrs (_: _: {
+                "ft-nixpalette".theme = lib.mkForce themeId;
+              }) config.home-manager.users;
+            })
+          ];
+        })
+        cfg.specialisations;
     }
 
     # DE integrations — each guarded by its own mkIf.
