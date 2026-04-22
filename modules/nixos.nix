@@ -16,13 +16,16 @@ let
   resolvedTheme = ftNixpaletteLib.resolve allThemes cfg.theme;
 
   deArgs = { inherit lib resolvedTheme; };
+  # Lazy thunk: each value is a *function* that returns the config.
+  # This prevents Nix from evaluating any DE import until the mkIf condition
+  # is actually checked, avoiding infinite recursion.
   deNixosConfigs = {
-    Hyprland = (import ./integrations/de/hyprland.nix deArgs).nixosConfig;
-    MangoWC  = (import ./integrations/de/mangowc.nix  deArgs).nixosConfig;
-    Niri     = (import ./integrations/de/niri.nix     deArgs).nixosConfig;
-    GNOME    = (import ./integrations/de/gnome.nix    deArgs).nixosConfig;
-    KDE      = (import ./integrations/de/kde.nix      deArgs).nixosConfig;
-    COSMIC   = (import ./integrations/de/cosmic.nix   deArgs).nixosConfig;
+    Hyprland = _: (import ./integrations/de/hyprland.nix deArgs).nixosConfig;
+    MangoWC  = _: (import ./integrations/de/mangowc.nix  deArgs).nixosConfig;
+    Niri     = _: (import ./integrations/de/niri.nix     deArgs).nixosConfig;
+    GNOME    = _: (import ./integrations/de/gnome.nix    deArgs).nixosConfig;
+    KDE      = _: (import ./integrations/de/kde.nix      deArgs).nixosConfig;
+    COSMIC   = _: (import ./integrations/de/cosmic.nix   deArgs).nixosConfig;
   };
 
   stylixConfig = import ./stylix.nix {
@@ -161,13 +164,14 @@ in
       }) cfg.specialisations;
     }
 
-    # DE integrations — each guarded by its own mkIf to avoid evaluating
-    # cfg.integrations.de during the 'let' binding (which causes infinite recursion).
-    (lib.mkIf (cfg.integrations.de == "Hyprland") deNixosConfigs.Hyprland)
-    (lib.mkIf (cfg.integrations.de == "MangoWC")  deNixosConfigs.MangoWC)
-    (lib.mkIf (cfg.integrations.de == "Niri")     deNixosConfigs.Niri)
-    (lib.mkIf (cfg.integrations.de == "GNOME")    deNixosConfigs.GNOME)
-    (lib.mkIf (cfg.integrations.de == "KDE")      deNixosConfigs.KDE)
-    (lib.mkIf (cfg.integrations.de == "COSMIC")   deNixosConfigs.COSMIC)
+    # DE integrations — each guarded by its own mkIf.
+    # The config is fetched via a lazy thunk (function call) so the import
+    # is only evaluated when the condition is true.
+    (lib.mkIf (cfg.integrations.de == "Hyprland") (deNixosConfigs.Hyprland null))
+    (lib.mkIf (cfg.integrations.de == "MangoWC")  (deNixosConfigs.MangoWC null))
+    (lib.mkIf (cfg.integrations.de == "Niri")     (deNixosConfigs.Niri null))
+    (lib.mkIf (cfg.integrations.de == "GNOME")    (deNixosConfigs.GNOME null))
+    (lib.mkIf (cfg.integrations.de == "KDE")      (deNixosConfigs.KDE null))
+    (lib.mkIf (cfg.integrations.de == "COSMIC")   (deNixosConfigs.COSMIC null))
   ]);
 }

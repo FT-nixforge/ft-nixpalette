@@ -16,13 +16,16 @@ let
   resolvedTheme = ftNixpaletteLib.resolve allThemes cfg.theme;
 
   deArgs = { inherit lib resolvedTheme; };
+  # Lazy thunk: each value is a function that returns the config.
+  # This prevents Nix from evaluating any DE import until the mkIf condition
+  # is actually checked, avoiding infinite recursion.
   deHmConfigs = {
-    Hyprland = (import ./integrations/de/hyprland.nix deArgs).hmConfig;
-    MangoWC  = (import ./integrations/de/mangowc.nix  deArgs).hmConfig;
-    Niri     = (import ./integrations/de/niri.nix     deArgs).hmConfig;
-    GNOME    = (import ./integrations/de/gnome.nix    deArgs).hmConfig;
-    KDE      = (import ./integrations/de/kde.nix      deArgs).hmConfig;
-    COSMIC   = (import ./integrations/de/cosmic.nix   deArgs).hmConfig;
+    Hyprland = _: (import ./integrations/de/hyprland.nix deArgs).hmConfig;
+    MangoWC  = _: (import ./integrations/de/mangowc.nix  deArgs).hmConfig;
+    Niri     = _: (import ./integrations/de/niri.nix     deArgs).hmConfig;
+    GNOME    = _: (import ./integrations/de/gnome.nix    deArgs).hmConfig;
+    KDE      = _: (import ./integrations/de/kde.nix      deArgs).hmConfig;
+    COSMIC   = _: (import ./integrations/de/cosmic.nix   deArgs).hmConfig;
   };
 
   stylixConfig = import ./stylix.nix {
@@ -134,13 +137,14 @@ in
       xdg.dataFile."ft-nixpalette/themes.json".text  = themesJson;
     }
 
-    # DE integrations — each guarded by its own mkIf to avoid evaluating
-    # cfg.integrations.de during the 'let' binding (which causes infinite recursion).
-    (lib.mkIf (cfg.integrations.de == "Hyprland") deHmConfigs.Hyprland)
-    (lib.mkIf (cfg.integrations.de == "MangoWC")  deHmConfigs.MangoWC)
-    (lib.mkIf (cfg.integrations.de == "Niri")     deHmConfigs.Niri)
-    (lib.mkIf (cfg.integrations.de == "GNOME")    deHmConfigs.GNOME)
-    (lib.mkIf (cfg.integrations.de == "KDE")      deHmConfigs.KDE)
-    (lib.mkIf (cfg.integrations.de == "COSMIC")   deHmConfigs.COSMIC)
+    # DE integrations — each guarded by its own mkIf.
+    # The config is fetched via a lazy thunk (function call) so the import
+    # is only evaluated when the condition is true.
+    (lib.mkIf (cfg.integrations.de == "Hyprland") (deHmConfigs.Hyprland null))
+    (lib.mkIf (cfg.integrations.de == "MangoWC")  (deHmConfigs.MangoWC null))
+    (lib.mkIf (cfg.integrations.de == "Niri")     (deHmConfigs.Niri null))
+    (lib.mkIf (cfg.integrations.de == "GNOME")    (deHmConfigs.GNOME null))
+    (lib.mkIf (cfg.integrations.de == "KDE")      (deHmConfigs.KDE null))
+    (lib.mkIf (cfg.integrations.de == "COSMIC")   (deHmConfigs.COSMIC null))
   ]);
 }
