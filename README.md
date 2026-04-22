@@ -9,9 +9,11 @@ A reusable NixOS theme framework built on top of [Stylix](https://github.com/dan
 - NixOS Specialisations for near-instant theme switching
 - Color JSON export for live switcher integration
 - Stylix integration — no manual Stylix config needed
-- DE integration layer — Hyprland support built-in, more DEs planned
+- DE integration layer — Hyprland, MangoWC, Niri, GNOME, KDE, COSMIC
 
 ## Quick Install
+
+### Using the flake
 
 ```nix
 inputs.nixpalette.url = "github:FT-nixforge/ft-nixpalette";
@@ -25,10 +27,43 @@ ft-nixpalette = {
 };
 ```
 
-## Hyprland Integration
+### Versioning
 
-Setting `integrations.de = "Hyprland"` generates a color variable file from the
-active palette. Hyprland must already be installed; this only writes config.
+ft-nixpalette uses **Git tags** for versioning. You can pin to a specific version or follow a release channel:
+
+| URL | Behaviour |
+|-----|-----------|
+| `github:FT-nixforge/ft-nixpalette/v1.0.1` | Fixed version — never changes |
+| `github:FT-nixforge/ft-nixpalette/stable` | Rolling — latest stable release |
+| `github:FT-nixforge/ft-nixpalette/unstable` | Rolling — latest unstable release |
+| `github:FT-nixforge/ft-nixpalette/main` | Bleeding edge — latest commit |
+
+The `stable` / `unstable` tags are updated automatically when a release matching that status is published. They are **not** overwritten by releases with a different status — so `stable` always points to the last explicitly stable release.
+
+```nix
+# Pin to a specific version (reproducible)
+inputs.nixpalette.url = "github:FT-nixforge/ft-nixpalette/v1.0.1";
+
+# Or follow the stable channel
+inputs.nixpalette.url = "github:FT-nixforge/ft-nixpalette/stable";
+```
+
+## Desktop Environment Integration
+
+Setting `integrations.de` generates a color variable file from the active palette for the chosen desktop environment. The DE must already be installed; this only writes config files.
+
+### Supported DEs
+
+| Value | Desktop Environment |
+|-------|---------------------|
+| `"Hyprland"` | Hyprland |
+| `"MangoWC"` | MangoWC |
+| `"Niri"` | Niri |
+| `"GNOME"` | GNOME |
+| `"KDE"` | KDE Plasma |
+| `"COSMIC"` | COSMIC |
+
+### Example
 
 ```nix
 ft-nixpalette = {

@@ -16,14 +16,14 @@ let
   resolvedTheme = ftNixpaletteLib.resolve allThemes cfg.theme;
 
   deArgs = { inherit lib resolvedTheme; };
-  deNixosConfig =
-    if      cfg.integrations.de == "Hyprland" then (import ./integrations/de/hyprland.nix deArgs).nixosConfig
-    else if cfg.integrations.de == "MangoWC"  then (import ./integrations/de/mangowc.nix  deArgs).nixosConfig
-    else if cfg.integrations.de == "Niri"     then (import ./integrations/de/niri.nix     deArgs).nixosConfig
-    else if cfg.integrations.de == "GNOME"    then (import ./integrations/de/gnome.nix    deArgs).nixosConfig
-    else if cfg.integrations.de == "KDE"      then (import ./integrations/de/kde.nix      deArgs).nixosConfig
-    else if cfg.integrations.de == "COSMIC"   then (import ./integrations/de/cosmic.nix   deArgs).nixosConfig
-    else {};
+  deNixosConfigs = {
+    Hyprland = (import ./integrations/de/hyprland.nix deArgs).nixosConfig;
+    MangoWC  = (import ./integrations/de/mangowc.nix  deArgs).nixosConfig;
+    Niri     = (import ./integrations/de/niri.nix     deArgs).nixosConfig;
+    GNOME    = (import ./integrations/de/gnome.nix    deArgs).nixosConfig;
+    KDE      = (import ./integrations/de/kde.nix      deArgs).nixosConfig;
+    COSMIC   = (import ./integrations/de/cosmic.nix   deArgs).nixosConfig;
+  };
 
   stylixConfig = import ./stylix.nix {
     inherit lib pkgs resolvedTheme;
@@ -161,6 +161,7 @@ in
       }) cfg.specialisations;
     }
 
-    (lib.mkIf (cfg.integrations.de != null) deNixosConfig)
+    (lib.optionalAttrs (cfg.integrations.de != null)
+      (deNixosConfigs.${cfg.integrations.de} or {}))
   ]);
 }
