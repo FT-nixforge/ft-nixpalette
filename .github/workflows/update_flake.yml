@@ -14,19 +14,14 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup cache
         uses: actions/cache@v5
         with:
           path: |
-            /nix/store
             ~/.cache/nix
           key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
           restore-keys: |
@@ -34,6 +29,7 @@ jobs:
 
       - name: Configure Git
         run: |
+          git config --global --unset-all http.https://github.com/.extraheader || true
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
