@@ -10,7 +10,10 @@ let
   cfg = config."ft-nixpalette";
 
   # Check if home-manager is available in the NixOS configuration
-  hmAvailable = config ? home-manager.users;
+  hmAvailable = config ? home-manager;
+
+  # Pre-imported HM module so we can inject it via sharedModules
+  hmModule = import ./hm.nix { inherit ftNixpaletteLib builtinThemesDir defaultWallpaper; };
 
   # Default stylix overrides (fonts, cursor, opacity)
   defaultStylixOverrides = {
@@ -195,7 +198,11 @@ in
       environment.etc."ft-nixpalette/colors.json".text = colorsJson;
       environment.etc."ft-nixpalette/themes.json".text  = themesJson;
 
-      # ── Auto-configure Home-Manager ──────────────────────────────────────
+      # ── Auto-import HM module & configure Home-Manager ───────────────────
+      home-manager.sharedModules = lib.mkIf (hmAvailable && cfg.homeManagerIntegration.enable) [
+        hmModule
+      ];
+
       home-manager.users = lib.mkIf (hmAvailable && cfg.homeManagerIntegration.enable) (
         lib.mapAttrs (_: _: {
           "ft-nixpalette" = {
