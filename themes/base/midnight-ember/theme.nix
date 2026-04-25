@@ -91,7 +91,9 @@
   # Optional. You can set just the size, or also name/package when you want the
   # theme to ship a specific cursor family through Stylix.
   cursor = {
-    size = 24;
+    name    = "Bibata-Modern-Classic";
+    package = "bibata-cursors";
+    size    = 24;
   };
 
   # ─── Opacity ─────────────────────────────────────────────────────────────────

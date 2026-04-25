@@ -4,13 +4,10 @@
 { lib, pkgs, resolvedTheme, stylixOverrides, wallpaper }:
 
 let
-  fonts          = resolvedTheme.fonts or {};
-  cursorTheme    = resolvedTheme.cursor or {};
-  opacityTheme   = resolvedTheme.opacity or {};
+  fonts          = resolvedTheme.fonts;
+  cursorTheme    = resolvedTheme.cursor;
+  opacityTheme   = resolvedTheme.opacity;
   themeOverrides = resolvedTheme.overrides or {};
-  hasFonts       = fonts != {};
-  hasCursor      = cursorTheme != {};
-  hasOpacity     = opacityTheme != {};
   hasWallpaper   = resolvedTheme ? wallpaper && resolvedTheme.wallpaper != null;
 
   # Generate a solid-color wallpaper from the theme's background color.
@@ -45,22 +42,6 @@ let
         ("ft-nixpalette: Package '${packageRef}' (for ${subject}) not found in nixpkgs. "
         + "Check the package name in your theme definition.");
 
-  mkFontRole = role:
-    if builtins.hasAttr role fonts then
-      let
-        font = builtins.getAttr role fonts;
-      in
-      {
-        fonts = {
-          "${role}" = {
-            name    = lib.mkDefault font.name;
-            package = lib.mkDefault (resolvePkg "fonts.${role}" font.package);
-          };
-        };
-      }
-    else
-      {};
-
   # Extract cursor-related overrides so we can merge them correctly.
   # When the theme does not define a cursor, we still want stylixOverrides
   # to be able to set one without causing Stylix-internal null issues.
@@ -90,41 +71,52 @@ lib.mkMerge [
     image        = lib.mkDefault activeWallpaper;
   }
 
-  # Theme-provided fonts (mkDefault priority)
-  (lib.mkIf hasFonts (lib.mkMerge [
-    (mkFontRole "serif")
-    (mkFontRole "sansSerif")
-    (mkFontRole "monospace")
-    (mkFontRole "emoji")
-    (lib.mkIf (builtins.hasAttr "sizes" fonts) {
-      fonts.sizes = {
-        applications = lib.mkDefault (fonts.sizes.applications or 12);
-        desktop      = lib.mkDefault (fonts.sizes.desktop or 11);
-        popups       = lib.mkDefault (fonts.sizes.popups or 10);
-        terminal     = lib.mkDefault (fonts.sizes.terminal or 13);
+  # Theme-provided fonts (always present via themes/default.nix)
+  {
+    fonts = {
+      serif = {
+        name    = lib.mkDefault fonts.serif.name;
+        package = lib.mkDefault (resolvePkg "fonts.serif" fonts.serif.package);
       };
-    })
-  ]))
+      sansSerif = {
+        name    = lib.mkDefault fonts.sansSerif.name;
+        package = lib.mkDefault (resolvePkg "fonts.sansSerif" fonts.sansSerif.package);
+      };
+      monospace = {
+        name    = lib.mkDefault fonts.monospace.name;
+        package = lib.mkDefault (resolvePkg "fonts.monospace" fonts.monospace.package);
+      };
+      emoji = {
+        name    = lib.mkDefault fonts.emoji.name;
+        package = lib.mkDefault (resolvePkg "fonts.emoji" fonts.emoji.package);
+      };
+      sizes = {
+        applications = lib.mkDefault fonts.sizes.applications;
+        desktop      = lib.mkDefault fonts.sizes.desktop;
+        popups       = lib.mkDefault fonts.sizes.popups;
+        terminal     = lib.mkDefault fonts.sizes.terminal;
+      };
+    };
+  }
 
-  # Theme-provided cursor (mkDefault priority)
-  (lib.mkIf hasCursor {
-    cursor = lib.mkMerge [
-      (lib.optionalAttrs (builtins.hasAttr "name" cursorTheme) {
-        name = lib.mkDefault cursorTheme.name;
-      })
-      (lib.optionalAttrs (builtins.hasAttr "package" cursorTheme) {
-        package = lib.mkDefault (resolvePkg "cursor" cursorTheme.package);
-      })
-      (lib.optionalAttrs (builtins.hasAttr "size" cursorTheme) {
-        size = lib.mkDefault cursorTheme.size;
-      })
-    ];
-  })
+  # Theme-provided cursor (always present via themes/default.nix)
+  {
+    cursor = {
+      name    = lib.mkDefault cursorTheme.name;
+      package = lib.mkDefault (resolvePkg "cursor" cursorTheme.package);
+      size    = lib.mkDefault cursorTheme.size;
+    };
+  }
 
-  # Theme-provided opacity (mkDefault priority)
-  (lib.mkIf hasOpacity {
-    opacity = lib.mapAttrs (_: value: lib.mkDefault value) opacityTheme;
-  })
+  # Theme-provided opacity (always present via themes/default.nix)
+  {
+    opacity = {
+      applications = lib.mkDefault opacityTheme.applications;
+      desktop      = lib.mkDefault opacityTheme.desktop;
+      popups       = lib.mkDefault opacityTheme.popups;
+      terminal     = lib.mkDefault opacityTheme.terminal;
+    };
+  }
 
   # Theme overrides (plain values — highest theme priority)
   themeOverrides
