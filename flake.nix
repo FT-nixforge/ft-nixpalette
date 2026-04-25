@@ -1,4 +1,4 @@
-﻿{
+{
   description = "ft-nixpalette â€” a reusable NixOS theme framework built on Stylix";
 
   inputs = {
