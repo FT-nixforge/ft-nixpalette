@@ -2,8 +2,8 @@
   description = "ft-nixpalette â€” a reusable NixOS theme framework built on Stylix";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    stylix.url = "github:danth/stylix";
+    nixpkgs.url = "git+ssh://github:NixOS/nixpkgs/nixos-unstable";
+    stylix.url = "git+ssh://github:danth/stylix";
   };
 
   outputs = { self, nixpkgs, stylix, ... }:
