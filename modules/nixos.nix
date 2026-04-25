@@ -1,22 +1,17 @@
-# NixOS module for ft-nixpalette.
+﻿# NixOS module for ft-nixpalette.
 # Declares user-facing options, loads themes, resolves inheritance,
-# delegates to Stylix via modules/stylix.nix, and auto-configures
-# Home-Manager when available.
+# delegates to Stylix via modules/stylix.nix, and generates system-wide
+# DE integration configs.
+#
+# NOTE: This module does NOT auto-import anything into Home-Manager.
+# If you want ft-nixpalette in HM as well, use the HM module
+# (homeModules.default or homeModules.standalone) in your HM config.
 { ftNixpaletteLib, builtinThemesDir, defaultWallpaper }:
 
 { config, lib, pkgs, ... }:
 
 let
   cfg = config."ft-nixpalette";
-
-  # Check if home-manager is available in the NixOS configuration
-  hmAvailable = config ? home-manager;
-
-  # Pre-imported HM module so we can inject it via sharedModules
-  hmModule = import ./hm.nix { inherit ftNixpaletteLib builtinThemesDir defaultWallpaper; };
-
-  # NOTE: themes/default.nix provides fallback values for all theme fields.
-  # No defaultStylixOverrides needed — the resolver merges every theme with defaults.
 
   allThemes = ftNixpaletteLib.loadAllThemes {
     builtinRoot = builtinThemesDir;
@@ -26,9 +21,6 @@ let
   resolvedTheme = ftNixpaletteLib.resolve allThemes cfg.theme;
 
   deArgs = { inherit lib resolvedTheme; };
-  # Lazy thunk: each value is a *function* that returns the config.
-  # This prevents Nix from evaluating any DE import until the mkIf condition
-  # is actually checked, avoiding infinite recursion.
   deNixosConfigs = {
     Hyprland = _: (import ./integrations/de/hyprland.nix deArgs).nixosConfig;
     MangoWC  = _: (import ./integrations/de/mangowc.nix  deArgs).nixosConfig;
@@ -50,9 +42,6 @@ let
     base16   = resolvedTheme.base16;
   };
 
-  # Resolve every theme listed in preloadThemes and serialise the full set to
-  # a single JSON object keyed by theme ID.  A live-switcher can read this file
-  # and apply any pre-resolved palette at runtime without a Nix rebuild.
   themesJson =
     let
       preloadIds  = lib.unique ([ cfg.theme ] ++ cfg.preloadThemes);
@@ -118,10 +107,9 @@ in
         Additional Stylix options merged on top of theme-provided values.
         Theme values are set with mkDefault priority, so plain values here
         take precedence. For full control, use lib.mkForce.
-        Defaults are provided for fonts, cursor and opacity.
         Set to {} to disable all defaults.
       '';
-      example = lib.literalExpression ''{ cursor.size = 32; }'';
+      example = lib.literalExpression ''''{ cursor.size = 32; }'''';
     };
 
     specialisations = lib.mkOption {
@@ -160,39 +148,20 @@ in
       '';
     };
 
-    homeManagerIntegration = {
-      enable = lib.mkOption {
-        type        = lib.types.bool;
-        default     = true;
-        description = ''
-          Automatically configure ft-nixpalette for all home-manager users.
-          When enabled, the NixOS module will propagate all ft-nixpalette
-          settings (theme, userThemeDir, specialisations, preloadThemes,
-          stylixOverrides) to every home-manager user.
-        '';
-      };
-    };
-
   };
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
     {
+      # â”€â”€ Stylix configuration (system-wide) â”€â”€
+      # Theme values use mkDefault so users can override via stylixOverrides
+      # or by setting stylix.* directly in their NixOS config.
       stylix = stylixConfig;
 
+      # â”€â”€ System-wide theme files â”€â”€
       environment.etc."ft-nixpalette/colors.json".text = colorsJson;
       environment.etc."ft-nixpalette/themes.json".text  = themesJson;
 
-      # ── Auto-import HM module & configure Home-Manager ───────────────────
-      home-manager.sharedModules = lib.mkIf (hmAvailable && cfg.homeManagerIntegration.enable) [
-        hmModule
-      ];
-
-      # NOTE: We intentionally do NOT set home-manager.users here.
-      # The infinite recursion (reading config.home-manager.users to set home-manager.users)
-      # is avoided by letting the user configure ft-nixpalette in their HM config manually.
-      # The HM module is still available via sharedModules for convenience.
-
-      # ── Specialisations ──────────────────────────────────────────────────
+      # â”€â”€ Specialisations â”€â”€
       specialisation = lib.mapAttrs
         (name: themeId: {
           configuration = lib.mkMerge [
@@ -200,16 +169,12 @@ in
               "ft-nixpalette".theme          = lib.mkForce themeId;
               "ft-nixpalette".specialisations = lib.mkForce {};
             }
-            # NOTE: Specialisations are NixOS-only. HM users must switch
-            # via the NixOS specialisation or configure ft-nixpalette.theme manually.
           ];
         })
         cfg.specialisations;
     }
 
-    # DE integrations — each guarded by its own mkIf.
-    # The config is fetched via a lazy thunk (function call) so the import
-    # is only evaluated when the condition is true.
+    # DE integrations â€” each guarded by its own mkIf.
     (lib.mkIf (cfg.integrations.de == "Hyprland") (deNixosConfigs.Hyprland null))
     (lib.mkIf (cfg.integrations.de == "MangoWC")  (deNixosConfigs.MangoWC null))
     (lib.mkIf (cfg.integrations.de == "Niri")     (deNixosConfigs.Niri null))

@@ -1,5 +1,5 @@
-{
-  description = "ft-nixpalette — a reusable NixOS theme framework built on Stylix";
+﻿{
+  description = "ft-nixpalette â€” a reusable NixOS theme framework built on Stylix";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -10,14 +10,13 @@
   let
     ftNixpaletteLib  = import ./lib { inherit (nixpkgs) lib; };
     builtinThemesDir = ./themes;
-    # Use a flake-root wallpaper image as the default for all themes when present.
-    # Evaluates to null if none of the supported filenames exist, triggering the
-    # solid-color fallback.
     defaultWallpaper =
       if builtins.pathExists ./wallpaper.png then ./wallpaper.png
       else if builtins.pathExists ./wallpaper.jpg then ./wallpaper.jpg
       else if builtins.pathExists ./wallpaper.jpeg then ./wallpaper.jpeg
       else null;
+
+    modArgs = { inherit ftNixpaletteLib builtinThemesDir defaultWallpaper; };
   in
   {
     meta = {
@@ -26,24 +25,24 @@
       role         = "standalone";
       description  = "Base16 color theming engine";
       repo         = "github:FT-nixforge/nixpalette";
-      provides     = [ "nixosModules" "homeModules" "lib" ];
+      provides     = [ "nixosModules" "lib" ];
       dependencies = [];
       status       = "unstable";
-      version      = "1.4.0";
+      version      = "1.5.0";
     };
     lib = ftNixpaletteLib;
 
+    # â”€â”€ NixOS module (system-wide Stylix + ft-nixpalette) â”€â”€
+    # This is the ONLY supported way to use ft-nixpalette.
+    # It configures Stylix system-wide and provides theme resolution,
+    # DE integrations, and specialisations.
+    #
+    # Home-Manager users get config.lib.stylix.colors automatically
+    # via Stylix' own homeManagerIntegration â€” no HM module needed.
     nixosModules.default = {
       imports = [
         stylix.nixosModules.stylix
-        (import ./modules/nixos.nix { inherit ftNixpaletteLib builtinThemesDir defaultWallpaper; })
-      ];
-    };
-
-    homeModules.default = {
-      imports = [
-        stylix.homeModules.stylix
-        (import ./modules/hm.nix { inherit ftNixpaletteLib builtinThemesDir defaultWallpaper; })
+        (import ./modules/nixos.nix modArgs)
       ];
     };
   };
