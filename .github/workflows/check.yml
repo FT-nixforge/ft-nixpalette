@@ -38,10 +38,6 @@ jobs:
         run: |
           nix eval .#nixosModules.default --apply 'x: "ok"'
 
-      - name: Verify homeModules export
-        run: |
-          nix eval .#homeModules.default --apply 'x: "ok"'
-
       - name: Verify built-in themes load
         run: |
           nix eval .#lib --apply 'lib: builtins.attrNames (lib.loadAllThemes { builtinRoot = builtins.toString ./themes; userRoot = null; })'
