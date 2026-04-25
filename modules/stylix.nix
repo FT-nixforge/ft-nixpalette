@@ -61,6 +61,26 @@ let
     else
       {};
 
+  # Extract cursor-related overrides so we can merge them correctly.
+  # When the theme does not define a cursor, we still want stylixOverrides
+  # to be able to set one without causing Stylix-internal null issues.
+  cursorOverride = stylixOverrides.cursor or {};
+  hasCursorOverride = cursorOverride != {};
+
+  # Extract font-related overrides.
+  fontsOverride = stylixOverrides.fonts or {};
+  hasFontsOverride = fontsOverride != {};
+
+  # Extract opacity-related overrides.
+  opacityOverride = stylixOverrides.opacity or {};
+  hasOpacityOverride = opacityOverride != {};
+
+  # Everything in stylixOverrides that is NOT fonts, cursor, or opacity.
+  # These are passed through as-is (plain values take precedence).
+  otherOverrides = lib.filterAttrs
+    (n: _: n != "fonts" && n != "cursor" && n != "opacity")
+    stylixOverrides;
+
 in
 lib.mkMerge [
   {
@@ -70,6 +90,7 @@ lib.mkMerge [
     image        = lib.mkDefault activeWallpaper;
   }
 
+  # Theme-provided fonts (mkDefault priority)
   (lib.mkIf hasFonts (lib.mkMerge [
     (mkFontRole "serif")
     (mkFontRole "sansSerif")
@@ -85,6 +106,7 @@ lib.mkMerge [
     })
   ]))
 
+  # Theme-provided cursor (mkDefault priority)
   (lib.mkIf hasCursor {
     cursor = lib.mkMerge [
       (lib.optionalAttrs (builtins.hasAttr "name" cursorTheme) {
@@ -99,11 +121,56 @@ lib.mkMerge [
     ];
   })
 
+  # Theme-provided opacity (mkDefault priority)
   (lib.mkIf hasOpacity {
     opacity = lib.mapAttrs (_: value: lib.mkDefault value) opacityTheme;
   })
 
+  # Theme overrides (plain values — highest theme priority)
   themeOverrides
 
-  stylixOverrides
+  # stylixOverrides for fonts (plain values — override theme)
+  (lib.mkIf hasFontsOverride {
+    fonts = lib.mapAttrs
+      (role: value: {
+        name    = lib.mkDefault value.name or (throw "stylixOverrides.fonts.${role}.name is required");
+        package = lib.mkDefault (
+          if value ? package then
+            (if lib.isString value.package then resolvePkg "fonts.${role}" value.package else value.package)
+          else
+            (throw "stylixOverrides.fonts.${role}.package is required")
+        );
+      } // lib.optionalAttrs (value ? sizes) {
+        sizes = lib.mapAttrs (_: v: lib.mkDefault v) value.sizes;
+      })
+      fontsOverride;
+  })
+
+  # stylixOverrides for cursor (plain values — override theme)
+  # We always emit this block when stylixOverrides.cursor is set,
+  # regardless of whether the theme defines a cursor.
+  (lib.mkIf hasCursorOverride {
+    cursor = lib.mkMerge [
+      (lib.optionalAttrs (builtins.hasAttr "name" cursorOverride) {
+        name = cursorOverride.name;
+      })
+      (lib.optionalAttrs (builtins.hasAttr "package" cursorOverride) {
+        package =
+          if lib.isString cursorOverride.package
+          then resolvePkg "cursor" cursorOverride.package
+          else cursorOverride.package;
+      })
+      (lib.optionalAttrs (builtins.hasAttr "size" cursorOverride) {
+        size = cursorOverride.size;
+      })
+    ];
+  })
+
+  # stylixOverrides for opacity (plain values — override theme)
+  (lib.mkIf hasOpacityOverride {
+    opacity = lib.mapAttrs (_: value: value) opacityOverride;
+  })
+
+  # Any other stylixOverrides (passed through as-is)
+  otherOverrides
 ]
