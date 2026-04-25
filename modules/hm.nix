@@ -1,6 +1,8 @@
 # Home Manager module for ft-nixpalette.
 # Declares user-facing options, loads themes, resolves inheritance,
-# and delegates to Stylix via modules/stylix.nix.
+# and provides DE integrations and theme JSON files.
+# NOTE: Stylix is intentionally NOT configured here — the NixOS module
+# handles Stylix system-wide. This avoids duplicate definition errors.
 { ftNixpaletteLib, builtinThemesDir, defaultWallpaper }:
 
 { config, lib, pkgs, ... }:
@@ -26,12 +28,6 @@ let
     GNOME    = _: (import ./integrations/de/gnome.nix    deArgs).hmConfig;
     KDE      = _: (import ./integrations/de/kde.nix      deArgs).hmConfig;
     COSMIC   = _: (import ./integrations/de/cosmic.nix   deArgs).hmConfig;
-  };
-
-  stylixConfig = import ./stylix.nix {
-    inherit lib pkgs resolvedTheme;
-    inherit (cfg) stylixOverrides;
-    wallpaper = cfg.defaultWallpaper;
   };
 
   colorsJson = builtins.toJSON {
@@ -146,6 +142,7 @@ in
       '';
     };
 
+  };
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
     {
@@ -168,4 +165,4 @@ in
     (lib.mkIf (cfg.integrations.de == "KDE")      (deHmConfigs.KDE null))
     (lib.mkIf (cfg.integrations.de == "COSMIC")   (deHmConfigs.COSMIC null))
   ]);
-};
+}
