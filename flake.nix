@@ -27,12 +27,11 @@
       repo         = "github:FT-nixforge/nixpalette";
       provides     = [ "nixosModules" "lib" ];
       dependencies = [];
-      status       = "unstable";
       version      = "1.5.1";
     };
     lib = ftNixpaletteLib;
 
-    # â”€â”€ NixOS module (system-wide Stylix + ft-nixpalette) â”€â”€
+    # NixOS module (system-wide Stylix + ft-nixpalette)
     # This is the ONLY supported way to use ft-nixpalette.
     # It configures Stylix system-wide and provides theme resolution,
     # DE integrations, and specialisations.
