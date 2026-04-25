@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -46,14 +47,22 @@ jobs:
           nix eval .#nixosModules.default --apply 'x: "ok"'
           nix eval .#homeModules.default --apply 'x: "ok"'
 
-      - name: Commit and push flake.lock update
-        run: |
-          git add flake.lock
-          if git diff --cached --quiet; then
-            echo "No changes to flake.lock"
-            exit 0
-          fi
-          git commit -m "flake: update flake.lock [skip ci]"
-          git push origin main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: update-flake-lock
+          commit-message: "flake: update flake.lock"
+          title: "Update flake.lock"
+          body: |
+            Automated weekly `flake.lock` update.
+
+            Updated inputs:
+            - `nixpkgs`
+            - `stylix`
+
+            Flake check passed — lib, nixosModules, and homeModules all evaluate correctly.
+          labels: |
+            dependencies
+            automated
+          delete-branch: true
