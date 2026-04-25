@@ -1,4 +1,4 @@
-﻿# Home Manager module for ft-nixpalette.
+# Home Manager module for ft-nixpalette.
 # Declares user-facing options, loads themes, resolves inheritance,
 # configures Stylix for the user, and provides DE integrations.
 #

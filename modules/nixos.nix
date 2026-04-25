@@ -1,4 +1,4 @@
-﻿# NixOS module for ft-nixpalette.
+# NixOS module for ft-nixpalette.
 # Declares user-facing options, loads themes, resolves inheritance,
 # delegates to Stylix via modules/stylix.nix, and generates system-wide
 # DE integration configs.
