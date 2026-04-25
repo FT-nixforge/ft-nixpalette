@@ -15,25 +15,8 @@ let
   # Pre-imported HM module so we can inject it via sharedModules
   hmModule = import ./hm.nix { inherit ftNixpaletteLib builtinThemesDir defaultWallpaper; };
 
-  # Default stylix overrides (fonts, cursor, opacity).
-  # These are applied with mkDefault priority so theme values still win.
-  defaultStylixOverrides = {
-    fonts.monospace = {
-      name = lib.mkDefault "JetBrainsMono Nerd Font";
-      package = lib.mkDefault pkgs.nerd-fonts.jetbrains-mono;
-    };
-    cursor = {
-      package = lib.mkDefault pkgs.bibata-cursors;
-      name = lib.mkDefault "Bibata-Modern-Classic";
-      size = lib.mkDefault 24;
-    };
-    opacity = {
-      terminal = lib.mkDefault 0.95;
-      applications = lib.mkDefault 1.0;
-      desktop = lib.mkDefault 1.0;
-      popups = lib.mkDefault 1.0;
-    };
-  };
+  # NOTE: themes/default.nix provides fallback values for all theme fields.
+  # No defaultStylixOverrides needed — the resolver merges every theme with defaults.
 
   allThemes = ftNixpaletteLib.loadAllThemes {
     builtinRoot = builtinThemesDir;
@@ -130,7 +113,7 @@ in
 
     stylixOverrides = lib.mkOption {
       type        = lib.types.attrs;
-      default     = defaultStylixOverrides;
+      default     = {};
       description = ''
         Additional Stylix options merged on top of theme-provided values.
         Theme values are set with mkDefault priority, so plain values here
