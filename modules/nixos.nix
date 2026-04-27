@@ -1,11 +1,3 @@
-# NixOS module for ft-nixpalette.
-# Declares user-facing options, loads themes, resolves inheritance,
-# delegates to Stylix via modules/stylix.nix, and generates system-wide
-# DE integration configs.
-#
-# NOTE: This module does NOT auto-import anything into Home-Manager.
-# If you want ft-nixpalette in HM as well, use the HM module
-# (homeModules.default or homeModules.standalone) in your HM config.
 { ftNixpaletteLib, builtinThemesDir, defaultWallpaper }:
 
 { config, lib, pkgs, ... }:
@@ -13,24 +5,14 @@
 let
   cfg = config."ft-nixpalette";
 
-  allThemes = ftNixpaletteLib.loadAllThemes {
+  allThemes    = ftNixpaletteLib.loadAllThemes {
     builtinRoot = builtinThemesDir;
     userRoot    = cfg.userThemeDir;
   };
 
   resolvedTheme = ftNixpaletteLib.resolve allThemes cfg.theme;
 
-  deArgs = { inherit lib resolvedTheme; };
-  deNixosConfigs = {
-    Hyprland = _: (import ./integrations/de/hyprland.nix deArgs).nixosConfig;
-    MangoWC  = _: (import ./integrations/de/mangowc.nix  deArgs).nixosConfig;
-    Niri     = _: (import ./integrations/de/niri.nix     deArgs).nixosConfig;
-    GNOME    = _: (import ./integrations/de/gnome.nix    deArgs).nixosConfig;
-    KDE      = _: (import ./integrations/de/kde.nix      deArgs).nixosConfig;
-    COSMIC   = _: (import ./integrations/de/cosmic.nix   deArgs).nixosConfig;
-  };
-
-  stylixConfig = import ./stylix.nix {
+  stylixCfg = import ./stylix.nix {
     inherit lib pkgs resolvedTheme;
     inherit (cfg) stylixOverrides;
     wallpaper = cfg.defaultWallpaper;
@@ -44,18 +26,13 @@ let
 
   themesJson =
     let
-      preloadIds  = lib.unique ([ cfg.theme ] ++ cfg.preloadThemes);
-      resolveOne  = themeId:
-        let r = ftNixpaletteLib.resolve allThemes themeId;
-        in {
-          themeId  = themeId;
-          polarity = r.polarity;
-          base16   = r.base16;
-          meta     = r.meta or {};
-        };
+      ids        = lib.unique ([ cfg.theme ] ++ cfg.preloadThemes);
+      resolveOne = id:
+        let r = ftNixpaletteLib.resolve allThemes id;
+        in { themeId = id; polarity = r.polarity; base16 = r.base16; meta = r.meta or {}; };
     in
     builtins.toJSON (builtins.listToAttrs
-      (map (id: { name = id; value = resolveOne id; }) preloadIds));
+      (map (id: { name = id; value = resolveOne id; }) ids));
 
 in
 {
@@ -63,123 +40,116 @@ in
 
     enable = lib.mkEnableOption "ft-nixpalette theme management";
 
-    integrations = import ./integrations/de/default.nix { inherit lib; };
+    # ── Theme selection ────────────────────────────────────────────────────────
 
     theme = lib.mkOption {
-      type        = lib.types.str;
-      default     = "builtin:base/catppuccin-mocha";
+      type    = lib.types.str;
+      default = "builtin:base/catppuccin-mocha";
+      example = "builtin:base/nord";
       description = ''
-        Namespaced theme identifier to apply.
-        Use the format "<namespace>:<category>/<name>".
-        Examples: "builtin:base/catppuccin-mocha", "user:derived/my-theme".
+        Namespaced theme identifier.
+        Format: "<namespace>:<category>/<name>"
+        Built-in examples: "builtin:base/catppuccin-mocha", "builtin:base/nord"
+        User theme example: "user:derived/my-theme"
       '';
-      example = "builtin:base/catppuccin-mocha";
     };
 
     userThemeDir = lib.mkOption {
-      type        = lib.types.nullOr lib.types.path;
-      default     = null;
-      description = ''
-        Path to the user theme directory.
-        This directory should contain base/ and/or derived/ subdirectories,
-        each holding theme folders with a theme.nix inside.
-        Set to null to use only built-in themes.
-      '';
+      type    = lib.types.nullOr lib.types.path;
+      default = null;
       example = lib.literalExpression "./assets/themes";
+      description = ''
+        Path to a directory containing your own themes.
+        Expected layout: base/<name>/theme.nix and/or derived/<name>/theme.nix.
+        Set to null to use built-in themes only.
+      '';
     };
+
+    # ── Wallpaper ──────────────────────────────────────────────────────────────
 
     defaultWallpaper = lib.mkOption {
-      type        = lib.types.nullOr lib.types.path;
-      default     = defaultWallpaper;
+      type    = lib.types.nullOr lib.types.path;
+      default = defaultWallpaper;
+      example = lib.literalExpression "./wallpaper.png";
       description = ''
-        Wallpaper used for any theme that does not ship its own wallpaper image.
-        Defaults to a flake-root wallpaper image when present, otherwise null.
-        When null, a solid-color wallpaper is generated from the theme's base00.
-        Set this to override the flake default with your own image.
+        Fallback wallpaper for themes that do not ship their own image.
+        When null, a solid-color PNG is generated from the theme's base00.
+        Defaults to wallpaper.{png,jpg,jpeg} at the flake root if present.
       '';
-      example = lib.literalExpression "./my-wallpaper.png";
     };
+
+    # ── Stylix ─────────────────────────────────────────────────────────────────
 
     stylixOverrides = lib.mkOption {
-      type        = lib.types.attrs;
-      default     = {};
+      type    = lib.types.attrs;
+      default = {};
+      example = lib.literalExpression ''{ cursor.size = 32; }'';
       description = ''
-        Additional Stylix options merged on top of theme-provided values.
-        Theme values are set with mkDefault priority, so plain values here
-        take precedence. For full control, use lib.mkForce.
-        Set to {} to disable all defaults.
+        Stylix options merged on top of theme-provided values.
+        Theme values use mkDefault, so plain assignments here win.
+        Use lib.mkForce to override values set by Stylix itself.
       '';
-      example = lib.literalExpression ''''{ cursor.size = 32; }'''';
     };
 
-    specialisations = lib.mkOption {
-      type        = lib.types.attrsOf lib.types.str;
-      default     = {};
+    stylix = lib.mkOption {
+      type        = lib.types.attrs;
+      readOnly    = true;
+      default     = stylixCfg;
       description = ''
-        Pre-build alternative theme configurations as NixOS specialisations.
-        Each key is a specialisation name and each value is a namespaced theme ID.
-        Switch between pre-built themes instantly without a network build:
-          sudo /run/current-system/specialisation/<name>/bin/switch-to-configuration switch
+        The fully-resolved Stylix configuration for the active theme.
+        ft-nixpalette applies this automatically; expose it here so you can
+        reference or merge it in your own config:
+
+          stylix = config.ft-nixpalette.stylix;
       '';
+    };
+
+    # ── Theme switching ────────────────────────────────────────────────────────
+
+    specialisations = lib.mkOption {
+      type    = lib.types.attrsOf lib.types.str;
+      default = {};
       example = lib.literalExpression ''
         {
           dark  = "builtin:base/catppuccin-mocha";
           light = "builtin:base/nord";
         }
       '';
+      description = ''
+        Pre-built alternative themes as NixOS specialisations.
+        Switch without a rebuild:
+          sudo /run/current-system/specialisation/<name>/bin/switch-to-configuration switch
+      '';
     };
 
     preloadThemes = lib.mkOption {
-      type        = lib.types.listOf lib.types.str;
-      default     = [];
+      type    = lib.types.listOf lib.types.str;
+      default = [];
+      example = lib.literalExpression ''[ "builtin:base/nord" "builtin:base/dracula" ]'';
       description = ''
-        List of additional theme IDs to resolve and bake into
-        /etc/ft-nixpalette/themes.json at build time.
-        The active theme is always included automatically.
-        A live theme switcher can read this file and apply any of the
-        preloaded palettes at runtime without a NixOS rebuild.
-      '';
-      example = lib.literalExpression ''
-        [
-          "builtin:base/nord"
-          "builtin:base/dracula"
-          "builtin:base/tokyo-night"
-        ]
+        Additional theme IDs to resolve and bake into /etc/ft-nixpalette/themes.json.
+        The active theme is always included. Use this to feed a live theme switcher
+        with pre-resolved palettes so it can switch at runtime without a rebuild.
       '';
     };
 
   };
 
-  config = lib.mkIf cfg.enable (lib.mkMerge [
-    {
-      # â”€â”€ Stylix configuration (system-wide) â”€â”€
-      # Theme values use mkDefault so users can override via stylixOverrides
-      # or by setting stylix.* directly in their NixOS config.
-      stylix = stylixConfig;
+  config = lib.mkIf cfg.enable {
 
-      # â”€â”€ System-wide theme files â”€â”€
-      environment.etc."ft-nixpalette/colors.json".text = colorsJson;
-      environment.etc."ft-nixpalette/themes.json".text  = themesJson;
+    stylix = stylixCfg;
 
-      # â”€â”€ Specialisations â”€â”€
-      specialisation = lib.mapAttrs
-        (name: themeId: {
-          configuration = lib.mkMerge [
-            {
-              "ft-nixpalette".theme          = lib.mkForce themeId;
-              "ft-nixpalette".specialisations = lib.mkForce {};
-            }
-          ];
-        })
-        cfg.specialisations;
-    }
+    environment.etc."ft-nixpalette/colors.json".text = colorsJson;
+    environment.etc."ft-nixpalette/themes.json".text  = themesJson;
 
-    # DE integrations â€” each guarded by its own mkIf.
-    (lib.mkIf (cfg.integrations.de == "Hyprland") (deNixosConfigs.Hyprland null))
-    (lib.mkIf (cfg.integrations.de == "MangoWC")  (deNixosConfigs.MangoWC null))
-    (lib.mkIf (cfg.integrations.de == "Niri")     (deNixosConfigs.Niri null))
-    (lib.mkIf (cfg.integrations.de == "GNOME")    (deNixosConfigs.GNOME null))
-    (lib.mkIf (cfg.integrations.de == "KDE")      (deNixosConfigs.KDE null))
-    (lib.mkIf (cfg.integrations.de == "COSMIC")   (deNixosConfigs.COSMIC null))
-  ]);
+    specialisation = lib.mapAttrs
+      (_: themeId: {
+        configuration = {
+          "ft-nixpalette".theme          = lib.mkForce themeId;
+          "ft-nixpalette".specialisations = lib.mkForce {};
+        };
+      })
+      cfg.specialisations;
+
+  };
 }

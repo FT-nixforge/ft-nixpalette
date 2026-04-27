@@ -1,29 +1,27 @@
 # ft-nixpalette
 
-A reusable NixOS theme framework built on top of [Stylix](https://github.com/danth/stylix). ft-nixpalette provides folder-based theme definitions, a parent-child inheritance model, and a clean separation between built-in and user-defined themes.
+A NixOS theme framework built on top of [Stylix](https://github.com/danth/stylix). ft-nixpalette provides folder-based theme definitions with parent-child inheritance, and configures Stylix system-wide — including boot menus, terminals, GTK, and everything else Stylix targets.
+
+**ft-nixpalette is system-only.** It configures Stylix at the NixOS level. Home Manager automatically inherits the theme via Stylix's own integration — no extra HM config needed.
 
 ## Highlights
 
-- 12 built-in base themes + 4 derived themes (Catppuccin, Nord, Dracula, Gruvbox, and more)
+- 12+ built-in themes (Catppuccin, Nord, Dracula, Gruvbox, and more)
 - Parent-child theme inheritance with deep merge
-- **Zero-config Home-Manager integration** — set it once in NixOS, HM is auto-configured
-- NixOS Specialisations for near-instant theme switching (auto-propagated to Home-Manager)
+- NixOS Specialisations for near-instant theme switching
 - Sensible Stylix defaults (font, cursor, opacity) out of the box, fully overridable
-- Color JSON export for live switcher integration
-- Stylix integration — no manual Stylix config needed
-- DE integration layer — Hyprland, MangoWC, Niri, GNOME, KDE, COSMIC
+- Exposes `config.ft-nixpalette.stylix` — the resolved Stylix config — for advanced use
+- Color JSON at `/etc/ft-nixpalette/` for live switcher integration
 
-## Quick Install
+## Quick Start
 
-### Using the flake
-
-Add the input to your flake:
+Add the input:
 
 ```nix
 inputs.nixpalette.url = "github:FT-nixforge/ft-nixpalette";
 ```
 
-Import the NixOS module and enable it:
+Import the module and enable it:
 
 ```nix
 imports = [ inputs.nixpalette.nixosModules.default ];
@@ -34,29 +32,71 @@ ft-nixpalette = {
 };
 ```
 
-That's it. Home-Manager is configured automatically. Specialisations switch instantly. Stylix defaults (font, cursor, opacity) are applied out of the box.
+That's it. Stylix is configured system-wide. Boot menus, terminals, GTK, and all other Stylix targets are themed automatically. Home Manager receives `config.lib.stylix.colors` without any additional setup.
 
 ---
 
-## Options Reference
+## Options
 
 ### `ft-nixpalette.enable`
 
-Enable ft-nixpalette theme management. **Type:** `bool`
+Enable ft-nixpalette. **Type:** `bool`
 
 ### `ft-nixpalette.theme`
 
 Namespaced theme identifier. **Default:** `"builtin:base/catppuccin-mocha"`
 
-Examples: `"builtin:base/nord"`, `"user:derived/my-theme"`
+Format: `"<namespace>:<category>/<name>"`
+
+```nix
+theme = "builtin:base/nord";
+theme = "user:derived/my-theme";
+```
 
 ### `ft-nixpalette.userThemeDir`
 
-Path to your own theme directory (containing `base/` and/or `derived/`). **Default:** `null`
+Path to your own theme directory. Expected layout: `base/<name>/theme.nix` and/or `derived/<name>/theme.nix`. **Default:** `null`
+
+```nix
+userThemeDir = ./assets/themes;
+```
+
+### `ft-nixpalette.defaultWallpaper`
+
+Fallback wallpaper for themes that don't ship their own image. When `null`, a solid-color PNG is generated from the theme's `base00`. Defaults to `wallpaper.{png,jpg,jpeg}` at the flake root if present.
+
+### `ft-nixpalette.stylixOverrides`
+
+Stylix options merged on top of theme-provided values. Theme values use `mkDefault`, so plain assignments here win. **Default:** `{}`
+
+```nix
+stylixOverrides = {
+  cursor.size = 32;
+  fonts.monospace = {
+    name    = "Iosevka";
+    package = pkgs.iosevka;
+  };
+};
+```
+
+### `ft-nixpalette.stylix` *(read-only)*
+
+The fully-resolved Stylix configuration for the active theme. ft-nixpalette applies this automatically, but you can also reference it yourself:
+
+```nix
+# Apply ft-nixpalette's theme directly to your own stylix config
+stylix = config.ft-nixpalette.stylix;
+
+# Or merge it with your own overrides
+stylix = lib.mkMerge [
+  config.ft-nixpalette.stylix
+  { targets.neovim.enable = false; }
+];
+```
 
 ### `ft-nixpalette.specialisations`
 
-Map of specialisation name → theme ID. **Default:** `{}`
+Pre-built alternative themes as NixOS specialisations. **Default:** `{}`
 
 ```nix
 specialisations = {
@@ -65,234 +105,38 @@ specialisations = {
 };
 ```
 
-Switch instantly without a network build:
+Switch without a rebuild:
+
 ```bash
 sudo /run/current-system/specialisation/light/bin/switch-to-configuration switch
 ```
 
 ### `ft-nixpalette.preloadThemes`
 
-Additional theme IDs to bake into `/etc/ft-nixpalette/themes.json`. **Default:** `[]`
-
-Useful for live theme switchers that need resolved palettes at runtime.
-
-### `ft-nixpalette.stylixOverrides`
-
-Override Stylix options. **Default:** sensible defaults for font, cursor, and opacity.
+Additional theme IDs baked into `/etc/ft-nixpalette/themes.json` at build time. The active theme is always included. **Default:** `[]`
 
 ```nix
-# Defaults applied automatically:
-{
-  fonts.monospace = {
-    name    = "JetBrainsMono Nerd Font";
-    package = pkgs.nerd-fonts.jetbrains-mono;
-  };
-  cursor = {
-    package = pkgs.bibata-cursors;
-    name    = "Bibata-Modern-Classic";
-    size    = 24;
-  };
-  opacity = {
-    terminal     = 0.95;
-    applications = 1.0;
-    desktop      = 1.0;
-    popups       = 1.0;
-  };
-}
+preloadThemes = [
+  "builtin:base/nord"
+  "builtin:base/dracula"
+];
 ```
-
-Set to `{}` to disable all defaults, or override individual values:
-```nix
-stylixOverrides.cursor.size = 32;
-```
-
-### `ft-nixpalette.homeManagerIntegration.enable`
-
-Auto-configure ft-nixpalette for all Home-Manager users. **Default:** `true`
-
-When enabled, the NixOS module:
-
-1. **Auto-imports** the ft-nixpalette Home-Manager module via `home-manager.sharedModules` — you do **not** need to add `inputs.nixpalette.homeModules.default` to your `home.nix` imports.
-2. **Propagates** all settings (`theme`, `userThemeDir`, `specialisations`, `preloadThemes`, `stylixOverrides`) to every Home-Manager user automatically.
-
-Set to `false` to configure Home-Manager manually (see below).
-
-### `ft-nixpalette.integrations.de`
-
-Desktop environment to generate color variables for. **Default:** `null`
-
-Supported: `"Hyprland"`, `"MangoWC"`, `"Niri"`, `"GNOME"`, `"KDE"`, `"COSMIC"`
-
----
-
-## Recommended User-Repo Pattern
-
-Instead of configuring `ft-nixpalette` directly everywhere, wrap it in your own module:
-
-**`modules/theming/default.nix`:**
-```nix
-{ config, pkgs, lib, ... }:
-
-let
-  cfg = config.ft.theming;
-in
-{
-  options.ft.theming = {
-    enable = lib.mkEnableOption "ft-nixpalette-based global theming";
-
-    theme = lib.mkOption {
-      type    = lib.types.str;
-      default = "builtin:base/catppuccin-mocha";
-    };
-
-    userThemeDir = lib.mkOption {
-      type    = lib.types.nullOr lib.types.path;
-      default = null;
-    };
-
-    specialisations = lib.mkOption {
-      type    = lib.types.attrsOf lib.types.str;
-      default = {};
-    };
-  };
-
-  config = lib.mkIf cfg.enable {
-    # Single line — everything auto-propagates to Home-Manager
-    ft-nixpalette = {
-      enable = true;
-      inherit (cfg) theme userThemeDir specialisations;
-    };
-
-    fonts.packages = [ pkgs.nerd-fonts.jetbrains-mono ];
-  };
-}
-```
-
-**`configuration.nix`:**
-```nix
-ft.theming = {
-  enable = true;
-  theme = "builtin:base/catppuccin-mocha";
-  userThemeDir = ../../assets/themes;
-  specialisations = {
-    nord    = "builtin:base/nord";
-    gruvbox = "user:base/gruvbox";
-  };
-};
-```
-
-**`home/features/theming.nix`:**
-```nix
-{ config, lib, osConfig, ... }:
-{
-  # ft-nixpalette HM config is auto-propagated from NixOS module.
-  # Only Hyprland-specific and Stylix target overrides remain here.
-
-  stylix.targets = {
-    neovim.enable    = false;
-    vim.enable       = false;
-    nvf.enable       = true;
-    hyprlock.enable  = false;
-    hyprpaper.enable = lib.mkForce false;
-  };
-
-  gtk.gtk4.theme = null;
-}
-```
-
-No manual `ft-nixpalette = { ... }` in `home.nix`. No specialisation mapping. No Stylix defaults to copy.
-
----
-
-## Manual Home-Manager Setup (Advanced)
-
-If you disable `homeManagerIntegration` (or use a standalone Home-Manager setup without NixOS), import the Home-Manager module manually:
-
-```nix
-imports = [ inputs.nixpalette.homeModules.default ];
-
-ft-nixpalette = {
-  enable = true;
-  theme  = "builtin:base/catppuccin-mocha";
-};
-```
-
-> **Why this is needed:** The NixOS module normally injects the Home-Manager module automatically via `home-manager.sharedModules`. If you disable `homeManagerIntegration`, the HM module is never imported, so the `ft-nixpalette.*` options don't exist in the HM context — leading to `error: The option 'ft-nixpalette.theme' was accessed but has no value defined`.
 
 ---
 
 ## Versioning
 
-ft-nixpalette uses **Git tags** for versioning. You can pin to a specific version or follow a release channel:
-
 | URL | Behaviour |
 |-----|-----------|
-| `github:FT-nixforge/ft-nixpalette/v1.0.1` | Fixed version — never changes |
-| `github:FT-nixforge/ft-nixpalette/stable` | Rolling — latest stable release |
-| `github:FT-nixforge/ft-nixpalette/unstable` | Rolling — latest unstable release |
-| `github:FT-nixforge/ft-nixpalette/main` | Bleeding edge — latest commit |
-
-The `stable` / `unstable` tags are updated automatically when a release matching that status is published. They are **not** overwritten by releases with a different status — so `stable` always points to the last explicitly stable release.
-
-```nix
-# Pin to a specific version (reproducible)
-inputs.nixpalette.url = "github:FT-nixforge/ft-nixpalette/v1.0.1";
-
-# Or follow the stable channel
-inputs.nixpalette.url = "github:FT-nixforge/ft-nixpalette/stable";
-```
-
----
-
-## Desktop Environment Integration
-
-Setting `integrations.de` generates a color variable file from the active palette for the chosen desktop environment. The DE must already be installed; this only writes config files.
-
-### Supported DEs
-
-| Value | Desktop Environment |
-|-------|---------------------|
-| `"Hyprland"` | Hyprland |
-| `"MangoWC"` | MangoWC |
-| `"Niri"` | Niri |
-| `"GNOME"` | GNOME |
-| `"KDE"` | KDE Plasma |
-| `"COSMIC"` | COSMIC |
-
-### Example
-
-```nix
-ft-nixpalette = {
-  enable = true;
-  theme  = "builtin:base/catppuccin-mocha";
-  integrations.de = "Hyprland";
-};
-```
-
-**Generated file:**
-
-| Context | Path |
-|---|---|
-| NixOS | `/etc/ft-nixpalette/hyprland/colors.conf` |
-| Home Manager | `~/.config/hypr/ft-nixpalette-colors.conf` |
-
-Source it in `hyprland.conf` to use `$ft_base0D` etc. anywhere:
-
-```conf
-source = ~/.config/hypr/ft-nixpalette-colors.conf
-
-# example usage
-col.active_border   = $ft_base0D $ft_base0E 45deg
-col.inactive_border = $ft_base03
-```
-
-Theming for Waybar, Rofi, hyprlock, and other DE tools is intentionally left to those tools' own configuration — ft-nixpalette exposes the palette via the color variables file and the JSON files (`colors.json`, `themes.json`) for them to consume.
+| `github:FT-nixforge/ft-nixpalette/v1.0.1` | Fixed version |
+| `github:FT-nixforge/ft-nixpalette/stable` | Latest stable |
+| `github:FT-nixforge/ft-nixpalette/unstable` | Latest unstable |
+| `github:FT-nixforge/ft-nixpalette/main` | Bleeding edge |
 
 ---
 
 ## Documentation
 
-Full documentation, options reference, theme guide, and examples:  
 **[ft-nixforge.github.io/community/ft-nixpalette](https://ft-nixforge.github.io/community/ft-nixpalette)**
 
 ## License
